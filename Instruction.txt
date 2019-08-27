@@ -1,0 +1,123 @@
+
+USB flash installation media
+
+##############################
+#                            #
+#   Инструкция для Windows   #
+#                            #
+##############################
+
+Распаковываем образ с ArchLinux-ом старше февраля 2019 года на флеш-карту. 
+
+На флеш-карте должны появится следующие папки:
+arch
+EFI
+isolinux
+loader
+
+Открываем файлик arch/boot/syslinux/archiso_sys.cfg (для загрузки с BIOS) на флехе с распакованным образом 
+и /lodare/entries/archiso-x86_64.conf (для UEFI)
+и меняем строки (почему однострочный не работает пока не разобрался) LINUX и INITRD на следующие:
+
+linux   /arch/boot/x86_64/vmlinuz
+initrd  /arch/boot/intel_ucode.img
+initrd  /arch/boot/amd_ucode.img
+initrd  /arch/boot/x86_64/archiso.img
+
+После чего - Ищем флешку - /dev/sdXn в консоли (подойдет и Cygwin и Git Windows)
+
+Для консоли Linux (grep -Ei "vfat|ntfs" можно не указывать, но с ним меньше устройств):
+$ lsblk -o NAME,MODEL,TYPE,FSTYPE,SIZE,MOUNTPOINT | grep -v "loop" | grep -v "room" | grep -v "arch-airootfs" | grep -Ei "vfat|ntfs"
+$ sudo blkid -o value -s UUID /dev/sdXn
+
+Для Cygwin и Git Windows:
+$ blkid
+
+И добавляем запись в строку APPEND вида <archisodevice=/dev/disk/by-uuid/88BC-C304> - естественно со своим UUID и без кавычек. 
+
+Например в файле arch/boot/syslinux/archiso_sys.cfg (для загрузки с BIOS):
+APPEND archisobasedir=arch archisolabel=ARCH_201907 archisodevice=/dev/disk/by-uuid/88BC-C304
+
+В файле /lodare/entries/archiso-x86_64.conf (для UEFI):
+options archisobasedir=arch archisolabel=ARCH_201908 archisodevice=/dev/disk/by-uuid/34E5-6CFF
+
+Распакуйте архив syslinux-6_04-pre1_tar.gz.
+
+Для более быстрого доступа - создайте текстовый файл в папке с распакованным syslinux-6.04-pre1/bios с любым именем (например cmd.txt) со одной записью: cmd.exe и поменяйте расширение на bat: cmd.bat. Теперь Запустите файл от имени администратора.
+
+Затем выполните в запущенной командной строке от имени администратора раздельно следующие команды построчно, Где X меняем на нашу флешку. Остальное не трогаем.
+
+for /r %Y in (*.c32) do copy "%Y" "X:\arch\boot\syslinux\" /y
+copy mbr\*.bin X:\arch\boot\syslinux\ /y
+
+Соответственно для установки самого syslinux: 
+win32\syslinux.exe -d /arch/boot/syslinux -i -a -m X:
+
+##############################
+#                            #
+#  Инструкция для ArchLinux  #
+#                            #
+##############################
+
+Примонтируйте вручную образ archlinux например в папку /mnt
+$ sudo mount -o loop archlinux-2019.02.01-x86_64.iso /mnt 1>/dev/null 2>/dev/null
+
+Проверяем, ищем наш /mnt:
+$ lsblk
+
+Скопируйте все файлы на вашу флешкарту. Далее для примера флеш-карта sdc1 c uuid 8649-706E.
+$ sudo cp -Rf mnt/* /run/media/mikl/8649-706E/
+
+На флеш-карте должны появится следующие папки: 
+arch
+EFI
+isolinux
+loader
+
+Можно отмонтировать образ с ArchLinux.
+
+Далее необходимо выполнить небольшой скрипт, в котором обязательно поправте точку монтирования _usb_point вашей флеш-карты и её эквивалентное название /dev/sdc - для установки загрузчика и внесения правок в файлы настроек syslinux.
+
+Или внесите указанные далее правки сами.
+
+Установка загрузчика:
+sudo extlinux --install /run/media/mikl/8649-706E/arch/boot/syslinux/
+
+Загрузочная запись:
+sudo dd bs=440 count=1 conv=notrunc if=/usr/lib/syslinux/bios/mbr.bin of=/dev/sdc
+
+Скопировать все необходимые загрузчику syslinux файлы:
+sudo cp -Rf /usr/lib/syslinux/bios/* /run/media/mikl/8649-706E/arch/boot/syslinux/
+
+Во всех конфигурационных файлах загрузчика необходимо исправить все boot на /arch/boot
+arch/boot/syslinux/archiso.cfg
+arch/boot/syslinux/archiso_head.cfg
+arch/boot/syslinux/archiso_pxe.cfg
+arch/boot/syslinux/archiso_sys.cfg
+arch/boot/syslinux/archiso_tail.cfg
+loader/entries/archiso-x86_64.conf
+
+
+##############################
+#                            #
+#         Скрипт             #
+#                            #
+##############################
+
+#!/bin/bash
+_usb_point="/run/media/mikl/8649-706E"
+sudo extlinux --install $_usb_point/arch/boot/syslinux/
+wait
+sudo dd bs=440 count=1 conv=notrunc if=/usr/lib/syslinux/bios/mbr.bin of=/dev/sdc
+wait
+sudo cp -Rf /usr/lib/syslinux/bios/* $_usb_point/arch/boot/syslinux/
+wait
+sed -i 's/boot/\/arch\/boot/g' $_usb_point/arch/boot/syslinux/archiso.cfg
+sed -i 's/boot/\/arch\/boot/g' $_usb_point/arch/boot/syslinux/archiso_head.cfg
+sed -i 's/boot/\/arch\/boot/g' $_usb_point/arch/boot/syslinux/archiso_pxe.cfg
+sed -i 's/boot/\/arch\/boot/g' $_usb_point/arch/boot/syslinux/archiso_sys.cfg
+sed -i 's/boot/\/arch\/boot/g' $_usb_point/arch/boot/syslinux/archiso_tail.cfg
+sed -i 's/APPEND/APPEND archisodevice=\/dev\/disk\/by-uuid\/8649-706E/' $_usb_point/arch/boot/syslinux/archiso_sys.cfg
+sed -i 's/options/options archisodevice=\/dev\/disk\/by-uuid\/8649-706E/' $_usb_point/loader/entries/archiso-x86_64.conf
+exit 0
+
