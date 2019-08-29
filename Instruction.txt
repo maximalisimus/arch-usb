@@ -24,13 +24,15 @@ initrd  /arch/boot/intel_ucode.img
 initrd  /arch/boot/amd_ucode.img
 initrd  /arch/boot/x86_64/archiso.img
 
-После чего - Ищем флешку - /dev/sdXn в консоли (подойдет и Cygwin и Git Windows)
+После чего - Ищем флешку - /dev/sdXn в консоли (подойдет только Cygwin)
 
 Для консоли Linux (grep -Ei "vfat|ntfs" можно не указывать, но с ним меньше устройств):
 $ lsblk -o NAME,MODEL,TYPE,FSTYPE,SIZE,MOUNTPOINT | grep -v "loop" | grep -v "room" | grep -v "arch-airootfs" | grep -Ei "vfat|ntfs"
 $ sudo blkid -o value -s UUID /dev/sdXn
 
-Для Cygwin и Git Windows:
+Для Cygwin.
+Устанавливаете базовый Cygwin и скопируйте в папку с установленым Cygwin-ом "bin" приложеный файл blkid соответствующей разрядности. 
+Запустите Cygwin и введите команду:
 $ blkid
 
 И добавляем запись в строку APPEND вида <archisodevice=/dev/disk/by-uuid/88BC-C304> - естественно со своим UUID и без кавычек. 
